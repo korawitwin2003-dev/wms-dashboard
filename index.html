@@ -11,7 +11,6 @@
             --border-color: #2a2a2a;
             --text-main: #ffffff;
             --text-muted: #888888;
-            --accent-white: #ffffff;
             --accent-gray: #333333;
         }
 
@@ -57,9 +56,6 @@
             cursor: pointer;
             color: var(--text-muted);
             transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .menu-item:hover, .menu-item.active {
@@ -70,8 +66,6 @@
         #main-content {
             flex: 1;
             position: relative;
-            display: flex;
-            flex-direction: column;
         }
 
         #canvas-container {
@@ -134,7 +128,6 @@
             border-radius: 4px;
             font-weight: 600;
             cursor: pointer;
-            transition: opacity 0.2s;
             margin-top: 10px;
         }
 
@@ -149,17 +142,15 @@
             transform: translate(-50%, -50%);
             color: var(--text-muted);
             font-size: 0.9rem;
-            letter-spacing: 1px;
         }
     </style>
-    <!-- Three.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 
     <div id="sidebar">
-        <div class="brand">คลังสินค้า 3D</div>
+        <div class="brand">ไอซ์ คลังเก็บสินค้า</div>
         <div class="menu-item active">ผังคลัง 3D</div>
         <div class="menu-item">รายการสินค้า</div>
         <div class="menu-item">บันทึกรับ-จ่าย</div>
@@ -190,12 +181,11 @@
     </div>
 
     <script>
-        // Web App API URL ของ Google Sheets
+        // นำ URL Web App จาก Step 2 มาวางตรงนี้
         const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyTa4qBlc2BnfHglJr_WzalCJS2vRd7h7bv6zbB8lb29LgwoQzHs6aZRCiVkCgPRrLr9w/exec';
 
         let sheetData = [];
 
-        // ดึงข้อมูลจาก Google Sheets
         async function fetchSheetData() {
             const statusEl = document.getElementById('sync-status');
             const loadingEl = document.getElementById('loading');
@@ -203,4 +193,112 @@
             statusEl.style.color = '#ffff00';
 
             try {
-                const response = await fetch(GOOGLE
+                const response = await fetch(GOOGLE_SCRIPT_URL);
+                sheetData = await response.json();
+                
+                document.getElementById('total-items').innerText = sheetData.length;
+                
+                let totalQty = 0;
+                sheetData.forEach(item => {
+                    const qty = item.Quantity || item.quantity || 0;
+                    totalQty += Number(qty);
+                });
+                document.getElementById('total-qty').innerText = totalQty;
+
+                statusEl.innerText = 'เชื่อมต่อสำเร็จ';
+                statusEl.style.color = '#00ff00';
+                loadingEl.style.display = 'none';
+            } catch (err) {
+                console.error("Error fetching data: ", err);
+                statusEl.innerText = 'ผิดพลาดในการโหลด';
+                statusEl.style.color = '#ff0000';
+                loadingEl.innerText = 'เชื่อมต่อ Google Sheets ไม่สำเร็จ';
+            }
+        }
+
+        // --- Three.js 3D Scene ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(30, 25, 35);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(20, 40, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        const gridHelper = new THREE.GridHelper(60, 30, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        const buildings = [];
+        const buildingPositions = [
+            { id: 1, name: "คลังสินค้า A1", x: -15, z: -10, w: 12, d: 15, h: 8 },
+            { id: 2, name: "คลังสินค้า A2", x: 15, z: -10, w: 12, d: 15, h: 8 },
+            { id: 3, name: "คลังสินค้า B1", x: -15, z: 12, w: 12, d: 15, h: 8 },
+            { id: 4, name: "คลังสินค้า B2", x: 15, z: 12, w: 12, d: 15, h: 8 }
+        ];
+
+        buildingPositions.forEach(pos => {
+            const geometry = new THREE.BoxGeometry(pos.w, pos.h, pos.d);
+            const material = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.1 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(pos.x, pos.h / 2, pos.z);
+            mesh.userData = pos;
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            mesh.add(line);
+
+            scene.add(mesh);
+            buildings.push(mesh);
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', (event) => {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(buildings);
+
+            if (intersects.length > 0) {
+                const selected = intersects[0].object;
+                buildings.forEach(b => b.material.color.setHex(0x222222));
+                selected.material.color.setHex(0x444444);
+                document.getElementById('warehouse-name').innerText = selected.userData.name;
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        fetchSheetData();
+    </script>
+</body>
+</html>
