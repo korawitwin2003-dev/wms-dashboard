@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบพยากรณ์คลังสินค้าและวิเคราะห์ข้อมูล (Warehouse Forecasting)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#16a34a',
+                            600: '#15803d',
+                            700: '#166534',
+                            dark: '#0f172a',
+                            accent: '#f59e0b',
+                            accentHover: '#d97706'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Kanit', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Google Fonts: Kanit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col bg-slate-100">
+
+    <!-- LOGIN OVERLAY / MODAL -->
+    <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 border border-slate-200 relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-600 via-amber-500 to-slate-800"></div>
+            
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm">
+                    <i class="fa-solid font-bold fa-warehouse"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">ระบบการจัดการคลังสินค้า</h2>
+                <p class="text-slate-500 text-sm mt-1">Warehouse Forecasting & Analytics</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อผู้ใช้งาน (Username)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                        <input type="text" id="loginUsername" value="PU - Warehouse Manager" required
+                            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">รหัสผ่าน (Password)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i class="fa-solid fa-lock"></i>
+                        </span>
+                        <input type="password" id="loginPassword" value="••••••••" required
+                            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm transition">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-600">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                        <span class="ml-2">จดจำการเข้าสู่ระบบ</span>
+                    </label>
+                    <a href="#" class="text-emerald-600 hover:underline">ลืมรหัสผ่าน?</a>
+                </div>
+
+                <button type="submit" 
+                    class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-lg shadow-emerald-600/30 transition duration-200 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>เข้าสู่ระบบ (Sign In)</span>
+                </button>
+            </form>
+
+            <div class="mt-6 pt-4 border-t border-slate-100 text-center">
+                <p class="text-xs text-slate-400">สาธิตการใช้งานด้วยบัญชีผู้จัดการคลังสินค้า (Demo)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN SYSTEM APP -->
+    <div id="mainApp" class="hidden flex-1 flex flex-col md:flex-row min-h-screen">
+
+        <!-- SIDEBAR NAVIGATION -->
+        <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col flex-shrink-0 shadow-xl">
+            <!-- Brand Logo -->
+            <div class="p-5 flex items-center space-x-3 border-b border-slate-800 bg-slate-950">
+                <div class="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-md">
+                    <i class="fa-solid fa-boxes-packing"></i>
+                </div>
+                <div>
+                    <h1 class="text-white font-bold text-base leading-tight">WMS Analytics</h1>
+                    <span class="text-xs text-slate-400 font-normal">คลังสินค้า 1-5 (Main Hub)</span>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <div class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">เมนูหลัก</div>
+                
+                <button onclick="switchTab('dashboard')" id="nav-dashboard"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-chart-pie w-5 text-emerald-400"></i>
+                    <span>ภาพรวมคลังสินค้า (Overview)</span>
+                </button>
+
+                <button onclick="switchTab('map3d')" id="nav-map3d"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-cubes w-5 text-indigo-400"></i>
+                    <span>ผังคลัง 3D (คลัง 1 - 5)</span>
+                </button>
+
+                <button onclick="switchTab('forecasting')" id="nav-forecasting"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-wand-magic-sparkles w-5 text-amber-400"></i>
+                    <span>พยากรณ์ความจุ (Forecasting)</span>
+                </button>
+
+                <div class="pt-4 pb-1 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">จัดการข้อมูล (Excel Sheets)</div>
+
+                <button onclick="switchTab('warehouseData')" id="nav-warehouseData"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-warehouse w-5 text-blue-400"></i>
+                    <span>Warehouse Data</span>
+                </button>
+
+                <button onclick="switchTab('inventoryData')" id="nav-inventoryData"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-boxes-stacked w-5 text-purple-400"></i>
+                    <span>Inventory Data</span>
+                </button>
+
+                <button onclick="switchTab('inboundData')" id="nav-inboundData"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-truck-ramp-box w-5 text-teal-400"></i>
+                    <span>Inbound Data</span>
+                </button>
+
+                <button onclick="switchTab('outboundData')" id="nav-outboundData"
+                    class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                    <i class="fa-solid fa-truck-fast w-5 text-orange-400"></i>
+                    <span>Outbound Data</span>
+                </button>
+            </nav>
+
+            <!-- User Info & Logout -->
+            <div class="p-4 border-t border-slate-800 bg-slate-950/50">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm">
+                            PU
+                        </div>
+                        <div>
+                            <div id="displayUsername" class="text-sm font-medium text-white truncate max-w-[110px]">PU - Manager</div>
+                            <div class="text-xs text-emerald-400 flex items-center">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> ออนไลน์
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="handleLogout()" title="ออกจากระบบ"
+                        class="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-100 overflow-y-auto">
+            
+            <!-- TOP HEADER BAR -->
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+                <div>
+                    <h2 id="pageTitle" class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <!-- Dynamic Title -->
+                    </h2>
+                    <p id="pageSubtitle" class="text-xs text-slate-500 mt-0.5"></p>
+                </div>
+
+                <!-- Quick Action Buttons & Clock -->
+                <div class="flex items-center space-x-3">
+                    <div class="hidden sm:flex items-center bg-slate-100 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-600 border border-slate-200">
+                        <i class="fa-regular fa-clock mr-2 text-slate-400"></i>
+                        <span id="currentTime">--:--:--</span>
+                    </div>
+
+                    <button onclick="openModal('addWarehouseModal')" 
+                        class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium shadow-sm transition flex items-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>เพิ่มคลังสินค้า</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- DYNAMIC TAB CONTENTS -->
+            <div class="p-6 space-y-6">
+
+                <!-- 1. DASHBOARD OVERVIEW TAB -->
+                <section id="tab-dashboard" class="tab-content space-y-6 hidden">
+                    
+                    <!-- KPI Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-medium text-slate-500 uppercase">คลังสินค้าทั้งหมด</p>
+                                <h3 id="kpiTotalWarehouses" class="text-2xl font-bold text-slate-800 mt-1">5</h3>
+                                <p class="text-xs text-slate-400 mt-1">คลัง (Main Logistics Hub)</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-building-circle-check"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-medium text-slate-500 uppercase">อัตราใช้พื้นที่เฉลี่ย</p>
+                                <h3 id="kpiAvgCapacity" class="text-2xl font-bold text-slate-800 mt-1">62.0%</h3>
+                                <p class="text-xs text-emerald-600 mt-1"><i class="fa-solid fa-arrow-trend-up"></i> อยู่ในเกณฑ์ปกติ</p>
+                            </div>
+                            <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-chart-area"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-medium text-slate-500 uppercase">รับเข้าวันนี้ (Inbound)</p>
+                                <h3 id="kpiInboundToday" class="text-2xl font-bold text-slate-800 mt-1">420</h3>
+                                <p class="text-xs text-slate-500 mt-1">หน่วย (Pallets)</p>
+                            </div>
+                            <div class="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-arrow-down-to-bracket"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-medium text-slate-500 uppercase">จ่ายออกวันนี้ (Outbound)</p>
+                                <h3 id="kpiOutboundToday" class="text-2xl font-bold text-slate-800 mt-1">310</h3>
+                                <p class="text-xs text-slate-500 mt-1">หน่วย (Pallets)</p>
+                            </div>
+                            <div class="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-amber-200 bg-amber-50/30 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold text-amber-700 uppercase">เตือนคลังใกล้เต็ม (>80%)</p>
+                                <h3 id="kpiNearFullCount" class="text-2xl font-bold text-amber-600 mt-1">2</h3>
+                                <p class="text-xs text-amber-600 mt-1">คลังที่ต้องเฝ้าระวัง</p>
+                            </div>
+                            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Dashboard Charts & Indicators -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Capacity Usage Gauge / Progress Cards -->
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+                                    <i class="fa-solid fa-gauge-high text-emerald-600"></i>
+                                    สถานะความจุคลังสินค้าหลัก
+                                </h3>
+                                <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">อัปเดตล่าสุด</span>
+                            </div>
+
+                            <div id="capacityProgressList" class="space-y-4 max-h-[380px] overflow-y-auto pr-2">
+                                <!-- Dynamic Progress Bars Populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Movement Trend Chart -->
+                        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+                                        <i class="fa-solid fa-chart-line text-blue-600"></i>
+                                        แนวโน้มการรับเข้า - จ่ายออก และพยากรณ์สินค้าคงคลัง
+                                    </h3>
+                                    <p class="text-xs text-slate-500">เปรียบเทียบข้อมูลจริงกับการพยากรณ์ 7 วันข้างหน้า</p>
+                                </div>
+                                <select id="dashboardChartFilter" onchange="updateDashboardChart()" 
+                                    class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-700">
+                                    <option value="WHO1">Warehouse WHO1</option>
+                                    <option value="ALL">รวมทุกคลังสินค้า</option>
+                                </select>
+                            </div>
+                            <div class="h-[320px] w-full">
+                                <canvas id="overviewTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 1.5 3D WAREHOUSE MAP TAB -->
+                <section id="tab-map3d" class="tab-content space-y-4 hidden">
+                    
+                    <!-- TOP METRICS & ACTION BAR (matching top section of sketch) -->
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <!-- 1. จำนวนคลัง -->
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">จำนวนคลัง</span>
+                                <span id="topBarTotalWarehouses" class="text-xl font-bold text-slate-800">5 คลัง</span>
+                            </div>
+                            <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-base">
+                                <i class="fa-solid fa-warehouse"></i>
+                            </div>
+                        </div>
+
+                        <!-- 2. รับเข้า / จ่ายออก -->
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">รับเข้า / จ่ายออก</span>
+                                <div class="flex items-center space-x-2 text-sm font-bold">
+                                    <span class="text-teal-600">+420</span>
+                                    <span class="text-slate-300">/</span>
+                                    <span class="text-orange-600">-310</span>
+                                </div>
+                            </div>
+                            <div class="w-9 h-9 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center text-base">
+                                <i class="fa-solid fa-arrows-up-down"></i>
+                            </div>
+                        </div>
+
+                        <!-- 3. อัตราการใช้คลัง % -->
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">อัตราการใช้คลัง %</span>
+                                <span id="topBarAvgPct" class="text-xl font-bold text-slate-800">62.0%</span>
+                            </div>
+                            <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
+                                <i class="fa-solid fa-chart-pie"></i>
+                            </div>
+                        </div>
+
+                        <!-- 4. แจ้งเตือน -->
+                        <div class="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 shadow-sm flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] font-bold text-amber-700 uppercase tracking-wider block">แจ้งเตือน (ใกล้เต็ม)</span>
+                                <span id="topBarAlertCount" class="text-xl font-bold text-amber-600">2 คลัง</span>
+                            </div>
+                            <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-base">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                        </div>
+
+                        <!-- 5. Action Buttons (Excel/CSV & +คลังสินค้า) -->
+                        <div class="col-span-2 md:col-span-1 bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center space-y-1.5">
+                            <button onclick="exportToCSV('warehouseTable')" class="w-full py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs border border-slate-300 transition flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                                <span>Excel / CSV</span>
+                            </button>
+                            <button onclick="openModal('addWarehouseModal')" class="w-full py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs shadow-sm transition flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>+ คลังสินค้า</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- MAIN LAYOUT: LEFT SIDEBAR (STATUS A1-A4) + CENTER 3D VIEWPORT -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        
+                        <!-- LEFT SIDEBAR: สถานะคลัง (A1, A2, A3, A4...) -->
+                        <div class="md:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                                    <i class="fa-solid fa-list-check text-indigo-600"></i>
+                                    <span>สถานะคลัง (Zone)</span>
+                                </h3>
+                                <span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">Select</span>
+                            </div>
+
+                            <!-- List of Warehouses (A1, A2, A3, A4...) -->
+                            <div id="leftWarehouseList" class="space-y-2 overflow-y-auto max-h-[460px] pr-1">
+                                <!-- Populated dynamically with A1, A2, A3... -->
+                            </div>
+                        </div>
+
+                        <!-- CENTER/RIGHT 3D VIEWPORT -->
+                        <div class="md:col-span-3 lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden h-[560px] flex flex-col">
+                            <!-- Top Status Indicator Bar inside 3D View -->
+                            <div class="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between bg-slate-950/80 backdrop-blur px-4 py-2.5 rounded-xl border border-slate-800 text-white text-xs shadow-md">
+                                <div class="flex items-center space-x-4">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-cube text-indigo-400 mr-1.5"></i>ผัง 3D แสดงเปอร์เซ็นต์:</span>
+                                    <span class="flex items-center gap-1 text-emerald-400 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> &lt;50%</span>
+                                    <span class="flex items-center gap-1 text-amber-400 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> 50-79%</span>
+                                    <span class="flex items-center gap-1 text-red-400 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> &ge;80%</span>
+                                </div>
+                                <button onclick="reset3DCamera()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] border border-slate-700 transition">
+                                    <i class="fa-solid fa-rotate mr-1"></i> Reset View
+                                </button>
+                            </div>
+
+                            <!-- 3D Canvas Container -->
+                            <div id="warehouse3DCanvasContainer" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+                            <!-- Floating Detailed Bottom Info Box when selected -->
+                            <div id="3dSelectedWarehouseInfo" class="absolute bottom-3 left-3 right-3 bg-slate-950/95 backdrop-blur border border-slate-800 rounded-xl p-4 text-white text-xs shadow-2xl transition-all duration-300">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-11 h-11 rounded-xl bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center text-indigo-400 font-bold text-base shadow-inner">
+                                            <i class="fa-solid fa-building-flag"></i>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center space-x-2">
+                                                <h4 id="selectedWarehouse3DName" class="font-bold text-base text-white">คลัง A1 - ศูนย์กระจายสินค้าหลัก</h4>
+                                                <span id="selectedWarehouse3DBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">ปานกลาง</span>
+                                            </div>
+                                            <div id="selectedWarehouse3DSub" class="text-slate-400 text-xs mt-0.5">คลิกเลือกคลังจากแถบซ้าย หรือคลิกอาคาร 3D ในฉาก</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 self-end md:self-auto">
+                                        <button onclick="openInboundModalForSelected()" class="px-2.5 py-1.5 bg-teal-600/80 hover:bg-teal-600 text-white rounded-lg text-xs font-medium border border-teal-500/40 transition flex items-center gap-1">
+                                            <i class="fa-solid fa-plus"></i> รับสินค้า
+                                        </button>
+                                        <button onclick="openOutboundModalForSelected()" class="px-2.5 py-1.5 bg-orange-600/80 hover:bg-orange-600 text-white rounded-lg text-xs font-medium border border-orange-500/40 transition flex items-center gap-1">
+                                            <i class="fa-solid fa-minus"></i> จ่ายสินค้า
+                                        </button>
+                                        <button onclick="switchTab('forecasting')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow transition flex items-center gap-1">
+                                            <i class="fa-solid fa-wand-magic-sparkles"></i> พยากรณ์
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Detailed Warehouse Statistics Grid -->
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-1">
+                                    <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] uppercase font-semibold block">ความจุทั้งหมด (Max)</span>
+                                        <span id="detailMaxCap" class="text-sm font-bold text-slate-200 mt-0.5 block">300 Pallets</span>
+                                    </div>
+                                    <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] uppercase font-semibold block">จัดเก็บปัจจุบัน (Used)</span>
+                                        <span id="detailUsedCap" class="text-sm font-bold text-amber-400 mt-0.5 block">255 Pallets</span>
+                                    </div>
+                                    <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] uppercase font-semibold block">พื้นที่ว่างเหลือ (Available)</span>
+                                        <span id="detailAvailCap" class="text-sm font-bold text-emerald-400 mt-0.5 block">45 Pallets</span>
+                                    </div>
+                                    <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] uppercase font-semibold block">ขนาดพื้นที่ / % ใช้ไป</span>
+                                        <div class="flex items-center justify-between mt-0.5">
+                                            <span id="detailArea" class="text-xs font-mono text-slate-300">500 ตร.ม.</span>
+                                            <span id="selectedWarehouse3DPct" class="font-extrabold text-sm text-red-400 font-mono">85%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. FORECASTING ENGINE TAB -->
+                <section id="tab-forecasting" class="tab-content space-y-6 hidden">
+                    <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                        <div class="absolute -right-10 -bottom-10 opacity-10 text-9xl">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </div>
+                        <div class="max-w-2xl">
+                            <span class="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-full uppercase tracking-wider">Predictive Intelligence</span>
+                            <h3 class="text-2xl font-bold mt-3">ระบบพยากรณ์การใช้พื้นที่คลังสินค้า</h3>
+                            <p class="text-slate-300 text-sm mt-1">คำนวณแนวโน้มสินค้าเข้า-ออกล่วงหน้า เพื่อป้องกันปัญหาพื้นที่เต็มและวางแผนบริหารการจัดเก็บได้อย่างแม่นยำ</p>
+                            
+                            <div class="mt-6 flex flex-wrap gap-4 items-center">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">เลือกคลังสินค้า</label>
+                                    <select id="forecastWarehouseSelect" onchange="runForecast()" 
+                                        class="bg-slate-800 border border-slate-700 text-white rounded-lg text-sm px-3 py-2 w-48 focus:ring-2 focus:ring-amber-500">
+                                        <!-- Options populated via JS -->
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">ระยะเวลาพยากรณ์</label>
+                                    <select id="forecastPeriodSelect" onchange="runForecast()" 
+                                        class="bg-slate-800 border border-slate-700 text-white rounded-lg text-sm px-3 py-2 w-40 focus:ring-2 focus:ring-amber-500">
+                                        <option value="7">7 วันข้างหน้า</option>
+                                        <option value="14">14 วันข้างหน้า</option>
+                                        <option value="30">30 วันข้างหน้า</option>
+                                    </select>
+                                </div>
+                                <div class="self-end">
+                                    <button onclick="runForecast()" 
+                                        class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold rounded-lg text-sm shadow-md transition">
+                                        <i class="fa-solid fa-calculator mr-1"></i> ประมวลผลพยากรณ์
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Forecast Results Cards & Chart -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Forecast Insights -->
+                        <div class="space-y-4">
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <h4 class="font-semibold text-slate-800 text-sm flex items-center justify-between">
+                                    <span>ผลการวิเคราะห์พยากรณ์</span>
+                                    <span id="forecastBadgeStatus" class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">ปกติ</span>
+                                </h4>
+                                
+                                <div class="mt-4 space-y-3">
+                                    <div class="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
+                                        <span class="text-slate-500">ความจุสูงสุด (Maximum):</span>
+                                        <span id="forecastMaxCap" class="font-semibold text-slate-800">300 Pallets</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
+                                        <span class="text-slate-500">สินค้าคงคลังปัจจุบัน:</span>
+                                        <span id="forecastCurrentStock" class="font-semibold text-slate-800">210 Pallets (70%)</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
+                                        <span class="text-slate-500">อัตราการรับเข้าเฉลี่ย/วัน:</span>
+                                        <span id="forecastAvgInbound" class="font-semibold text-emerald-600">+12.5 Pallets</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
+                                        <span class="text-slate-500">อัตราการจ่ายออกเฉลี่ย/วัน:</span>
+                                        <span id="forecastAvgOutbound" class="font-semibold text-orange-600">-8.2 Pallets</span>
+                                    </div>
+                                    <div class="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
+                                        <span class="text-slate-500">คาดการณ์สิ้นสุดระยะเวลา:</span>
+                                        <span id="forecastProjectedStock" class="font-semibold text-amber-600">240 Pallets (80%)</span>
+                                    </div>
+                                </div>
+
+                                <div id="forecastAlertBox" class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                                    <i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i>
+                                    <strong>ข้อแนะนำ:</strong> คลังสินค้านี้มีแนวโน้มจะใช้พื้นที่ทะลุ 80% ในอีก 5 วันข้างหน้า ควรจัดเตรียมแผนการถ่ายโอนสินค้า
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Forecast Chart -->
+                        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="font-semibold text-slate-800 text-sm">กราฟพยากรณ์เปอร์เซ็นต์การใช้พื้นที่ (% Occupancy Forecast)</h3>
+                                <span class="text-xs text-slate-400">เส้นประแสดงค่าพยากรณ์</span>
+                            </div>
+                            <div class="h-[320px] w-full">
+                                <canvas id="forecastChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. WAREHOUSE DATA TAB (Matching Excel Sheet 1) -->
+                <section id="tab-warehouseData" class="tab-content space-y-4 hidden">
+                    <!-- Action Header -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div class="relative w-full sm:w-72">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                            <input type="text" id="searchWarehouseInput" onkeyup="filterWarehouseTable()" placeholder="ค้นหา Warehouse ID หรือ Location..." 
+                                class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                            <button onclick="exportToCSV('warehouseTable')" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition border border-slate-300">
+                                <i class="fa-solid fa-file-excel mr-1 text-emerald-600"></i> ส่งออก Excel/CSV
+                            </button>
+                            <button onclick="openModal('addWarehouseModal')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition shadow-sm">
+                                <i class="fa-solid fa-plus mr-1"></i> เพิ่มข้อมูลคลัง
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Excel Data Table -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Sheet: Warehouse Data</span>
+                            <span id="warehouseCountBadge" class="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-medium">15 รายการ</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="warehouseTable" class="w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-slate-700 uppercase text-xs font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">Warehouse ID</th>
+                                        <th class="px-4 py-3">Location</th>
+                                        <th class="px-4 py-3 text-right">Maximum Capacity</th>
+                                        <th class="px-4 py-3 text-center">Storage Unit</th>
+                                        <th class="px-4 py-3 text-right">Available Capacity</th>
+                                        <th class="px-4 py-3 text-right">Warehouse Area</th>
+                                        <th class="px-4 py-3 text-center">สถานะการใช้งาน</th>
+                                        <th class="px-4 py-3 text-center">การจัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="warehouseTableBody" class="divide-y divide-slate-100 font-normal">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. INVENTORY DATA TAB (Matching Excel Sheet 2) -->
+                <section id="tab-inventoryData" class="tab-content space-y-4 hidden">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div class="text-sm font-semibold text-slate-700">
+                            ข้อมูลคงคลังสินค้าประวัติและแผนใช้พื้นที่ (Inventory Data Logs)
+                        </div>
+                        <button onclick="openModal('addInventoryModal')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition shadow-sm">
+                            <i class="fa-solid fa-plus mr-1"></i> บันทึกข้อมูลคงคลัง
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Sheet: Inventory Data</span>
+                            <span class="text-xs text-slate-500">อ้างอิงข้อมูลจริงจากไฟล์ Excel</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-slate-700 uppercase text-xs font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">วันที่ (Date)</th>
+                                        <th class="px-4 py-3 text-right">จำนวนพาเลทคงเหลือ</th>
+                                        <th class="px-4 py-3 text-right">ความจุคลัง</th>
+                                        <th class="px-4 py-3 text-right">การใช้พื้นที่ (%)</th>
+                                        <th class="px-4 py-3 text-center">สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventoryTableBody" class="divide-y divide-slate-100">
+                                    <!-- Dynamic Rows Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. INBOUND DATA TAB (Matching Excel Sheet 3) -->
+                <section id="tab-inboundData" class="tab-content space-y-4 hidden">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div class="text-sm font-semibold text-slate-700">
+                            รายการสินค้าเข้าคลัง (Inbound Transactions)
+                        </div>
+                        <button onclick="openModal('addInboundModal')" class="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-lg transition shadow-sm">
+                            <i class="fa-solid fa-plus mr-1"></i> บันทึกรับเข้าสินค้า
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Sheet: Inbound Data</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-slate-700 uppercase text-xs font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">วันที่รับสินค้า</th>
+                                        <th class="px-4 py-3">Warehouse ID</th>
+                                        <th class="px-4 py-3 text-right">จำนวนที่รับเข้า (Pallets)</th>
+                                        <th class="px-4 py-3">หมายเหตุ / ซัพพลายเออร์</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inboundTableBody" class="divide-y divide-slate-100">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 6. OUTBOUND DATA TAB (Matching Excel Sheet 4) -->
+                <section id="tab-outboundData" class="tab-content space-y-4 hidden">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div class="text-sm font-semibold text-slate-700">
+                            รายการสินค้าออกจากคลัง (Outbound Transactions)
+                        </div>
+                        <button onclick="openModal('addOutboundModal')" class="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-lg transition shadow-sm">
+                            <i class="fa-solid fa-plus mr-1"></i> บันทึกจ่ายออกสินค้า
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Sheet: Outbound Data</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-slate-700 uppercase text-xs font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">วันที่จ่ายสินค้า</th>
+                                        <th class="px-4 py-3">Warehouse ID</th>
+                                        <th class="px-4 py-3 text-right">จำนวนที่จ่ายออก (Pallets)</th>
+                                        <th class="px-4 py-3">ปลายทาง / ลูกค้า</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="outboundTableBody" class="divide-y divide-slate-100">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD WAREHOUSE -->
+    <div id="addWarehouseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 border border-slate-200 relative">
+            <button onclick="closeModal('addWarehouseModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-warehouse text-emerald-600"></i> เพิ่มข้อมูลคลังสินค้าใหม่
+            </h3>
+
+            <form onsubmit="saveNewWarehouse(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Warehouse ID</label>
+                        <input type="text" id="newWhoId" required placeholder="เช่น WHO16" 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Location</label>
+                        <input type="text" id="newWhoLoc" required placeholder="เช่น Lessus16" 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Maximum Capacity</label>
+                        <input type="number" id="newWhoMax" required value="300" 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Storage Unit</label>
+                        <input type="text" id="newWhoUnit" value="Pallet" required 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Available Capacity</label>
+                        <input type="number" id="newWhoAvail" required value="300" 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Warehouse Area</label>
+                        <input type="text" id="newWhoArea" value="500 ตร.ม." required 
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('addWarehouseModal')" 
+                        class="px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-100">ยกเลิก</button>
+                    <button type="submit" 
+                        class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 font-medium shadow-sm">บันทึกคลังสินค้า</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD INVENTORY RECORD -->
+    <div id="addInventoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-200 relative">
+            <button onclick="closeModal('addInventoryModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-800 mb-4">บันทึกสถานะคลังสินค้า (Inventory Log)</h3>
+
+            <form onsubmit="saveInventoryLog(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">วันที่ (Date)</label>
+                    <input type="date" id="newInvDate" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">จำนวนพาเลทคงเหลือ</label>
+                    <input type="number" id="newInvQty" required placeholder="เช่น 210" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">ความจุคลังรวม (Pallets)</label>
+                    <input type="number" id="newInvMax" value="300" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('addInventoryModal')" class="px-4 py-2 border border-slate-300 text-sm rounded-lg">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD INBOUND RECORD -->
+    <div id="addInboundModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-200 relative">
+            <button onclick="closeModal('addInboundModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-800 mb-4 text-teal-700">บันทึกรับเข้าสินค้า (Inbound)</h3>
+
+            <form onsubmit="saveInboundLog(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">วันที่รับเข้า</label>
+                    <input type="date" id="newInboundDate" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Warehouse ID</label>
+                    <select id="newInboundWho" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">จำนวนที่รับเข้า (Pallets)</label>
+                    <input type="number" id="newInboundQty" required placeholder="เช่น 25" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">หมายเหตุ / Supplier</label>
+                    <input type="text" id="newInboundNote" placeholder="เช่น Supplier A - ล็อต 102" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('addInboundModal')" class="px-4 py-2 border border-slate-300 text-sm rounded-lg">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700">บันทึกรับเข้า</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD OUTBOUND RECORD -->
+    <div id="addOutboundModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-200 relative">
+            <button onclick="closeModal('addOutboundModal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-slate-800 mb-4 text-orange-700">บันทึกจ่ายออกสินค้า (Outbound)</h3>
+
+            <form onsubmit="saveOutboundLog(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">วันที่จ่ายออก</label>
+                    <input type="date" id="newOutboundDate" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Warehouse ID</label>
+                    <select id="newOutboundWho" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">จำนวนที่จ่ายออก (Pallets)</label>
+                    <input type="number" id="newOutboundQty" required placeholder="เช่น 15" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">ปลายทาง / ลูกค้า</label>
+                    <input type="text" id="newOutboundNote" placeholder="เช่น ลูกค้าสาขา กรุงเทพฯ" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal('addOutboundModal')" class="px-4 py-2 border border-slate-300 text-sm rounded-lg">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700">บันทึกจ่ายออก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2"></div>
+
+    <!-- APPLICATION LOGIC & JAVASCRIPT -->
+    <script>
+        // Main Dataset: Warehouses labeled as Zone A1 - A5
+        let warehouses = [
+            { id: 'คลัง A1', location: 'โซนกระจายสินค้า A1', maxCap: 300, unit: 'Pallet', availCap: 45, area: '500 ตร.ม.' },  // 85% Full (Red)
+            { id: 'คลัง A2', location: 'โซนกระจายสินค้า A2', maxCap: 300, unit: 'Pallet', availCap: 110, area: '500 ตร.ม.' }, // 63.3% (Yellow)
+            { id: 'คลัง A3', location: 'โซนกระจายสินค้า A3', maxCap: 300, unit: 'Pallet', availCap: 180, area: '500 ตร.ม.' }, // 40% (Green)
+            { id: 'คลัง A4', location: 'โซนกระจายสินค้า A4', maxCap: 300, unit: 'Pallet', availCap: 30, area: '500 ตร.ม.' },  // 90% Full (Red)
+            { id: 'คลัง A5', location: 'โซนกระจายสินค้า A5', maxCap: 300, unit: 'Pallet', availCap: 205, area: '500 ตร.ม.' }  // 31.6% (Green)
+        ];
+
+        // Inventory Data Logs
+        let inventoryData = [
+            { date: '07/Oct/2026', current: 150, max: 300, usage: 50.00 },
+            { date: '12/Oct/2026', current: 170, max: 300, usage: 56.67 },
+            { date: '15/Oct/2026', current: 185, max: 300, usage: 61.67 },
+            { date: '20/Oct/2026', current: 200, max: 300, usage: 66.67 },
+            { date: '24/Oct/2026', current: 210, max: 300, usage: 70.00 }
+        ];
+
+        // Inbound Data
+        let inboundData = [
+            { date: '2026-10-01', whoId: 'คลัง 1', qty: 30, supplier: 'Supplier A - Logistics Co.' },
+            { date: '2026-10-05', whoId: 'คลัง 1', qty: 25, supplier: 'Supplier B - Factory Line 2' },
+            { date: '2026-10-10', whoId: 'คลัง 2', qty: 45, supplier: 'Import Distribution' },
+            { date: '2026-10-15', whoId: 'คลัง 4', qty: 40, supplier: 'Local Warehouse Transfer' },
+            { date: '2026-10-22', whoId: 'คลัง 3', qty: 50, supplier: 'Supplier C - Bulk Cargo' }
+        ];
+
+        // Outbound Data
+        let outboundData = [
+            { date: '2026-10-03', whoId: 'คลัง 1', qty: 10, destination: 'สาขา บางนา' },
+            { date: '2026-10-08', whoId: 'คลัง 1', qty: 15, destination: 'สาขา ชลบุรี' },
+            { date: '2026-10-14', whoId: 'คลัง 2', qty: 30, destination: 'ลูกค้าองค์กร K-Group' },
+            { date: '2026-10-18', whoId: 'คลัง 4', qty: 12, destination: 'ศูนย์กระจายสินค้าภาคเหนือ' }
+        ];
+
+        // Chart References
+        let overviewChartInstance = null;
+        let forecastChartInstance = null;
+        let currentlySelected3DWarehouseId = 'คลัง A1';
+
+        // Navigation Titles Meta
+        const tabMeta = {
+            'dashboard': { title: '<i class="fa-solid fa-chart-pie text-emerald-600"></i> ภาพรวมคลังสินค้า (Dashboard Overview)', sub: 'สรุปสถานะการจัดเก็บและดรรชนีวัดผลสำคัญของ คลัง 1 - คลัง 5' },
+            'map3d': { title: '<i class="fa-solid fa-cubes text-indigo-600"></i> แผนผังคลังสินค้า 3D (3D Warehouse Map)', sub: 'แสดงสถานะเปอร์เซ็นต์ความจุแยกสี: สีแดง (ใกล้เต็ม >=80%), สีเหลือง (ปานกลาง 50-79%), สีเขียว (ว่าง <50%)' },
+            'forecasting': { title: '<i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> ระบบพยากรณ์ความจุคลังสินค้า (Demand & Occupancy Forecast)', sub: 'แบบจำลองการคาดการณ์พื้นที่จัดเก็บและแจ้งเตือนพื้นที่เต็ม' },
+            'warehouseData': { title: '<i class="fa-solid fa-warehouse text-blue-600"></i> ข้อมูลคลังสินค้า (Warehouse Data)', sub: 'รายการสถานที่คลัง ความจุ และสถานะพื้นที่คงเหลือ' },
+            'inventoryData': { title: '<i class="fa-solid fa-boxes-stacked text-purple-600"></i> ข้อมูลสินค้าคงคลัง (Inventory Data)', sub: 'บันทึกประวัติการใช้พื้นที่และจำนวนพาเลท' },
+            'inboundData': { title: '<i class="fa-solid fa-truck-ramp-box text-teal-600"></i> ข้อมูลสินค้าเข้า (Inbound Data)', sub: 'ประวัติและรายการรับสินค้าเข้าสู่คลัง' },
+            'outboundData': { title: '<i class="fa-solid fa-truck-fast text-orange-600"></i> ข้อมูลสินค้าออก (Outbound Data)', sub: 'ประวัติและรายการจ่ายสินค้าออกจากคลัง' }
+        };
+
+        // Populate Warehouse Select Dropdowns
+        function populateWarehouseSelects() {
+            const selects = ['forecastWarehouseSelect', 'dashboardChartFilter', 'newInboundWho', 'newOutboundWho'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                
+                let oldVal = el.value;
+                el.innerHTML = '';
+                
+                if (id === 'dashboardChartFilter') {
+                    el.innerHTML = '<option value="ALL">รวมทุกคลังสินค้า (คลัง 1-5)</option>';
+                }
+
+                warehouses.forEach(w => {
+                    const opt = document.createElement('option');
+                    opt.value = w.id;
+                    opt.innerText = `${w.id} (${w.location})`;
+                    el.appendChild(opt);
+                });
+
+                if (oldVal) el.value = oldVal;
+            });
+        }
+
+        // Render Dashboard Overview
+        function renderDashboard() {
+            populateWarehouseSelects();
+
+            // Calculate KPIs
+            document.getElementById('kpiTotalWarehouses').innerText = warehouses.length;
+
+            let totalMax = 0, totalUsed = 0, nearFullCount = 0;
+            warehouses.forEach(w => {
+                totalMax += w.maxCap;
+                let used = w.maxCap - w.availCap;
+                totalUsed += used;
+                let pct = (used / w.maxCap) * 100;
+                if (pct >= 80) nearFullCount++;
+            });
+
+            let avgPct = totalMax > 0 ? ((totalUsed / totalMax) * 100).toFixed(1) : 0;
+            document.getElementById('kpiAvgCapacity').innerText = `${avgPct}%`;
+            document.getElementById('kpiNearFullCount').innerText = nearFullCount;
+
+            // Sync Top Metric Bar in 3D Tab
+            if (document.getElementById('topBarTotalWarehouses')) {
+                document.getElementById('topBarTotalWarehouses').innerText = `${warehouses.length} คลัง`;
+                document.getElementById('topBarAvgPct').innerText = `${avgPct}%`;
+                document.getElementById('topBarAlertCount').innerText = `${nearFullCount} คลัง`;
+            }
+
+            // Render Progress List
+            const listEl = document.getElementById('capacityProgressList');
+            if (listEl) {
+                listEl.innerHTML = '';
+                warehouses.forEach(w => {
+                    let used = w.maxCap - w.availCap;
+                    let pct = Math.round((used / w.maxCap) * 100);
+
+                    let colorClass = 'bg-emerald-500';
+                    let badgeClass = 'bg-emerald-100 text-emerald-800';
+                    let statusText = 'ว่าง (<50%)';
+
+                    if (pct >= 80) {
+                        colorClass = 'bg-red-500';
+                        badgeClass = 'bg-red-100 text-red-800';
+                        statusText = 'ใกล้เต็ม (>=80%)';
+                    } else if (pct >= 50) {
+                        colorClass = 'bg-amber-500';
+                        badgeClass = 'bg-amber-100 text-amber-800';
+                        statusText = 'ปานกลาง (50-79%)';
+                    }
+
+                    listEl.innerHTML += `
+                        <div class="space-y-1.5 p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer" onclick="switchTab('map3d')">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="font-bold text-slate-800">${w.id} - ${w.location}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${statusText}</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-500">
+                                <span>ใช้งาน: ${used} / ${w.maxCap} ${w.unit}</span>
+                                <span class="font-bold text-slate-700">${pct}%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div class="h-2 rounded-full ${colorClass} transition-all duration-500" style="width: ${pct}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            updateDashboardChart();
+        }
+
+        // Render Left Sidebar for 3D Tab (A1, A2, A3, A4...)
+        function renderLeftSidebar3D() {
+            const container = document.getElementById('leftWarehouseList');
+            if (!container) return;
+            container.innerHTML = '';
+
+            warehouses.forEach(w => {
+                let used = w.maxCap - w.availCap;
+                let pct = Math.round((used / w.maxCap) * 100);
+
+                let badgeColor = 'bg-emerald-500 text-white';
+                if (pct >= 80) badgeColor = 'bg-red-500 text-white';
+                else if (pct >= 50) badgeColor = 'bg-amber-500 text-slate-900';
+
+                container.innerHTML += `
+                    <button onclick="focus3DWarehouse('${w.id}')" 
+                        class="w-full p-3 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/50 transition flex items-center justify-between text-left group">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs group-hover:bg-indigo-600 group-hover:text-white transition">
+                                ${w.id.replace('คลัง ', '')}
+                            </div>
+                            <div>
+                                <div class="font-bold text-xs text-slate-800">${w.id}</div>
+                                <div class="text-[10px] text-slate-400">${w.location}</div>
+                            </div>
+                        </div>
+                        <span class="px-2 py-1 rounded-lg text-xs font-bold font-mono ${badgeColor}">
+                            ${pct}%
+                        </span>
+                    </button>
+                `;
+            });
+        }
+
+        // Focus and select 3D Warehouse from left sidebar
+        function focus3DWarehouse(whoId) {
+            const target = warehouses.find(w => w.id === whoId);
+            if (!target) return;
+
+            select3DWarehouse(target);
+
+            // Animate camera to focus on building mesh
+            const mesh = warehouseMeshes.find(m => m.userData.warehouseData.id === whoId);
+            if (mesh && controls) {
+                const pos = mesh.parent.position;
+                controls.target.set(pos.x, 2.5, pos.z);
+                camera.position.set(pos.x, 15, pos.z + 20);
+                controls.update();
+            }
+        }
+
+        // Three.js 3D Warehouse Map Scene Initialization & Mechanics
+        let scene, camera, renderer, controls;
+        let warehouseMeshes = [];
+        let is3DInitialized = false;
+
+        function init3DWarehouseScene() {
+            const container = document.getElementById('warehouse3DCanvasContainer');
+            if (!container) return;
+
+            if (is3DInitialized && renderer) {
+                onWindowResize3D();
+                return;
+            }
+
+            container.innerHTML = '';
+            const width = container.clientWidth || 800;
+            const height = container.clientHeight || 500;
+
+            // Scene & Camera setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a); // Tailwind slate-900
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
+
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(0, 30, 45);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Orbit Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 100;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(30, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            // Grid Floor Plane
+            const gridHelper = new THREE.GridHelper(80, 20, 0x6366f1, 0x1e293b);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            // Floor geometry
+            const floorGeo = new THREE.PlaneGeometry(100, 100);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x020617, roughness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.02;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            build3D5WarehouseGrid();
+
+            // Raycasting for object selection
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            container.addEventListener('click', (e) => {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(warehouseMeshes);
+
+                if (intersects.length > 0) {
+                    const hit = intersects[0].object;
+                    if (hit.userData && hit.userData.warehouseData) {
+                        select3DWarehouse(hit.userData.warehouseData);
+                    }
+                }
+            });
+
+            window.addEventListener('resize', onWindowResize3D);
+            is3DInitialized = true;
+            animate3D();
+        }
+
+        function reset3DCamera() {
+            if (camera && controls) {
+                camera.position.set(0, 30, 45);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }
+        }
+
+        function build3D5WarehouseGrid() {
+            // Clear existing warehouse meshes
+            warehouseMeshes.forEach(m => {
+                scene.remove(m.parent);
+            });
+            warehouseMeshes = [];
+
+            // Layout 5 Warehouses in 2 rows matching Sketch
+            const positions = [
+                { x: -18, z: -10 },
+                { x: -9, z: -10 },
+                { x: 0, z: -10 },
+                { x: 9, z: -10 },
+                { x: 18, z: -10 },
+                { x: -18, z: 10 },
+                { x: -9, z: 10 },
+                { x: 0, z: 10 },
+                { x: 9, z: 10 },
+                { x: 18, z: 10 }
+            ];
+
+            warehouses.slice(0, 10).forEach((w, idx) => {
+                const pos = positions[idx] || { x: (idx - 2) * 9, z: 0 };
+                const group = new THREE.Group();
+                group.position.set(pos.x, 0, pos.z);
+
+                let used = w.maxCap - w.availCap;
+                let pct = Math.round((used / w.maxCap) * 100);
+
+                // Color coding rules: Red >=80%, Yellow 50-79%, Green <50%
+                let colorHex = 0x10b981; // Emerald Green
+                if (pct >= 80) colorHex = 0xef4444;      // Red
+                else if (pct >= 50) colorHex = 0xf59e0b; // Yellow/Amber
+
+                // Building Main Body
+                const buildingGeo = new THREE.BoxGeometry(6, 5, 8);
+                const buildingMat = new THREE.MeshStandardMaterial({
+                    color: colorHex,
+                    roughness: 0.4,
+                    metalness: 0.2
+                });
+                const buildingMesh = new THREE.Mesh(buildingGeo, buildingMat);
+                buildingMesh.position.y = 2.5;
+                buildingMesh.castShadow = true;
+                buildingMesh.receiveShadow = true;
+                buildingMesh.userData = { warehouseData: w };
+
+                // Roof Geometry (Prism / Pyramid Roof matching diagram sketch)
+                const roofGeo = new THREE.ConeGeometry(5.2, 2.5, 4);
+                const roofMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 });
+                const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+                roofMesh.position.y = 6.25;
+                roofMesh.rotation.y = Math.PI / 4;
+                roofMesh.castShadow = true;
+
+                group.add(buildingMesh);
+                group.add(roofMesh);
+
+                scene.add(group);
+                warehouseMeshes.push(buildingMesh);
+            });
+
+            if (warehouses.length > 0) {
+                select3DWarehouse(warehouses[0]);
+            }
+        }
+
+        function update3DWarehouseColors() {
+            if (!is3DInitialized) return;
+            build3D5WarehouseGrid();
+        }
+
+        function onWindowResize3D() {
+            const container = document.getElementById('warehouse3DCanvasContainer');
+            if (!container || !renderer || !camera) return;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function select3DWarehouse(w) {
+            currentlySelected3DWarehouseId = w.id;
+            const used = w.maxCap - w.availCap;
+            const pct = Math.round((used / w.maxCap) * 100);
+
+            document.getElementById('selectedWarehouse3DName').innerText = `${w.id} - ${w.location}`;
+            document.getElementById('selectedWarehouse3DSub').innerText = `รหัสคลัง: ${w.id} | หน่วยนับ: ${w.unit} | พื้นที่: ${w.area}`;
+            
+            document.getElementById('detailMaxCap').innerText = `${w.maxCap} ${w.unit}`;
+            document.getElementById('detailUsedCap').innerText = `${used} ${w.unit}`;
+            document.getElementById('detailAvailCap').innerText = `${w.availCap} ${w.unit}`;
+            document.getElementById('detailArea').innerText = w.area;
+
+            const badgeEl = document.getElementById('selectedWarehouse3DBadge');
+            const pctEl = document.getElementById('selectedWarehouse3DPct');
+            pctEl.innerText = `${pct}%`;
+
+            if (pct >= 80) {
+                pctEl.className = 'font-extrabold text-sm text-red-400 font-mono';
+                badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30';
+                badgeEl.innerText = 'เตือนพื้นที่ใกล้เต็ม (>=80%)';
+            } else if (pct >= 50) {
+                pctEl.className = 'font-extrabold text-sm text-amber-400 font-mono';
+                badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                badgeEl.innerText = 'ปานกลาง (50-79%)';
+            } else {
+                pctEl.className = 'font-extrabold text-sm text-emerald-400 font-mono';
+                badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                badgeEl.innerText = 'ว่าง (<50%)';
+            }
+        }
+
+        function openInboundModalForSelected() {
+            openModal('addInboundModal');
+            const sel = document.getElementById('newInboundWho');
+            if (sel && currentlySelected3DWarehouseId) {
+                sel.value = currentlySelected3DWarehouseId;
+            }
+        }
+
+        function openOutboundModalForSelected() {
+            openModal('addOutboundModal');
+            const sel = document.getElementById('newOutboundWho');
+            if (sel && currentlySelected3DWarehouseId) {
+                sel.value = currentlySelected3DWarehouseId;
+            }
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            if (controls) controls.update();
+            if (renderer && scene && camera) renderer.render(scene, camera);
+        }
+
+        // Authentication Handlers
+        function handleLogin(e) {
+            if (e) e.preventDefault();
+            const username = document.getElementById('loginUsername').value || 'PU - Warehouse Manager';
+            document.getElementById('displayUsername').innerText = username;
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            switchTab('dashboard');
+            showToast('เข้าสู่ระบบสำเร็จ', 'success');
+        }
+
+        function handleLogout() {
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('loginModal').classList.remove('hidden');
+            showToast('ออกจากระบบเรียบร้อยแล้ว');
+        }
+
+        // Navigation Tab Switcher
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-800', 'text-white');
+                btn.classList.add('text-slate-300');
+            });
+
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            const activeNav = document.getElementById(`nav-${tabId}`);
+
+            if (activeTab) activeTab.classList.remove('hidden');
+            if (activeNav) {
+                activeNav.classList.add('bg-slate-800', 'text-white');
+                activeNav.classList.remove('text-slate-300');
+            }
+
+            if (tabMeta[tabId]) {
+                document.getElementById('pageTitle').innerHTML = tabMeta[tabId].title;
+                document.getElementById('pageSubtitle').innerText = tabMeta[tabId].sub;
+            }
+
+            if (tabId === 'dashboard') {
+                renderDashboard();
+            } else if (tabId === 'map3d') {
+                renderLeftSidebar3D();
+                setTimeout(init3DWarehouseScene, 100);
+            } else if (tabId === 'forecasting') {
+                runForecast();
+            } else if (tabId === 'warehouseData') {
+                renderWarehouseTable();
+            } else if (tabId === 'inventoryData') {
+                renderInventoryTable();
+            } else if (tabId === 'inboundData') {
+                renderInboundTable();
+            } else if (tabId === 'outboundData') {
+                renderOutboundTable();
+            }
+        }
+
+        // Render Data Tables
+        function renderWarehouseTable() {
+            const tbody = document.getElementById('warehouseTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            warehouses.forEach(w => {
+                let used = w.maxCap - w.availCap;
+                let pct = Math.round((used / w.maxCap) * 100);
+                let badge = '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">ว่าง (<50%)</span>';
+                if (pct >= 80) badge = '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">ใกล้เต็ม (>=80%)</span>';
+                else if (pct >= 50) badge = '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">ปานกลาง (50-79%)</span>';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-3 font-semibold text-slate-800">${w.id}</td>
+                        <td class="px-4 py-3">${w.location}</td>
+                        <td class="px-4 py-3 text-right font-mono">${w.maxCap} ${w.unit}</td>
+                        <td class="px-4 py-3 text-center">${w.unit}</td>
+                        <td class="px-4 py-3 text-right font-mono text-emerald-600 font-semibold">${w.availCap} ${w.unit}</td>
+                        <td class="px-4 py-3 text-right font-mono">${w.area}</td>
+                        <td class="px-4 py-3 text-center">${badge}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="deleteWarehouse('${w.id}')" class="text-slate-400 hover:text-red-500 transition px-2 py-1">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            document.getElementById('warehouseCountBadge').innerText = `${warehouses.length} รายการ`;
+        }
+
+        function filterWarehouseTable() {
+            const query = document.getElementById('searchWarehouseInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#warehouseTableBody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+
+        function deleteWarehouse(id) {
+            warehouses = warehouses.filter(w => w.id !== id);
+            renderWarehouseTable();
+            renderDashboard();
+            if (is3DInitialized) build3D5WarehouseGrid();
+            showToast(`ลบข้อมูล ${id} เรียบร้อยแล้ว`);
+        }
+
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventoryTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            inventoryData.forEach(inv => {
+                let badge = '<span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800 font-medium">ปกติ</span>';
+                if (inv.usage >= 80) badge = '<span class="px-2 py-0.5 rounded text-xs bg-red-100 text-red-800 font-medium">ใกล้เต็ม</span>';
+                else if (inv.usage >= 50) badge = '<span class="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800 font-medium">ปานกลาง</span>';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 font-mono">${inv.date}</td>
+                        <td class="px-4 py-3 text-right font-semibold">${inv.current}</td>
+                        <td class="px-4 py-3 text-right font-mono text-slate-500">${inv.max}</td>
+                        <td class="px-4 py-3 text-right font-bold text-slate-700">${inv.usage.toFixed(2)}%</td>
+                        <td class="px-4 py-3 text-center">${badge}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderInboundTable() {
+            const tbody = document.getElementById('inboundTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            inboundData.forEach(inb => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 font-mono">${inb.date}</td>
+                        <td class="px-4 py-3 font-semibold text-teal-700">${inb.whoId}</td>
+                        <td class="px-4 py-3 text-right font-bold text-teal-600">+${inb.qty}</td>
+                        <td class="px-4 py-3 text-slate-600">${inb.supplier || '-'}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderOutboundTable() {
+            const tbody = document.getElementById('outboundTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            outboundData.forEach(outb => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 font-mono">${outb.date}</td>
+                        <td class="px-4 py-3 font-semibold text-orange-700">${outb.whoId}</td>
+                        <td class="px-4 py-3 text-right font-bold text-orange-600">-${outb.qty}</td>
+                        <td class="px-4 py-3 text-slate-600">${outb.destination || '-'}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Charts Rendering Logic
+        function updateDashboardChart() {
+            const filter = document.getElementById('dashboardChartFilter').value;
+            const ctx = document.getElementById('overviewTrendChart').getContext('2d');
+
+            const labels = ['01 Oct', '05 Oct', '10 Oct', '15 Oct', '20 Oct', '24 Oct', '28 Oct (P)', '31 Oct (P)'];
+            let inboundSeries = [30, 25, 45, 40, 50, 35, 40, 42];
+            let outboundSeries = [10, 15, 30, 12, 25, 20, 28, 30];
+
+            if (filter !== 'ALL') {
+                inboundSeries = inboundSeries.map(val => Math.round(val * 0.25));
+                outboundSeries = outboundSeries.map(val => Math.round(val * 0.22));
+            }
+
+            if (overviewChartInstance) overviewChartInstance.destroy();
+
+            overviewChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'สินค้าเข้า (Inbound)',
+                            data: inboundSeries,
+                            borderColor: '#0d9488',
+                            backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'สินค้าออก (Outbound)',
+                            data: outboundSeries,
+                            borderColor: '#ea580c',
+                            backgroundColor: 'rgba(234, 88, 12, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function runForecast() {
+            const whoId = document.getElementById('forecastWarehouseSelect').value || 'คลัง 1';
+            const days = parseInt(document.getElementById('forecastPeriodSelect').value) || 7;
+            const targetWho = warehouses.find(w => w.id === whoId) || warehouses[0];
+
+            const maxCap = targetWho.maxCap;
+            const currentStock = maxCap - targetWho.availCap;
+            const currentPct = (currentStock / maxCap) * 100;
+
+            const avgIn = 12.5;
+            const avgOut = 8.2;
+            const netDailyGrowth = avgIn - avgOut;
+
+            const projectedStock = Math.min(maxCap, Math.round(currentStock + (netDailyGrowth * days)));
+            const projectedPct = Math.round((projectedStock / maxCap) * 100);
+
+            document.getElementById('forecastMaxCap').innerText = `${maxCap} Pallets`;
+            document.getElementById('forecastCurrentStock').innerText = `${currentStock} Pallets (${currentPct.toFixed(1)}%)`;
+            document.getElementById('forecastAvgInbound').innerText = `+${avgIn} Pallets`;
+            document.getElementById('forecastAvgOutbound').innerText = `-${avgOut} Pallets`;
+            document.getElementById('forecastProjectedStock').innerText = `${projectedStock} Pallets (${projectedPct}%)`;
+
+            const alertBox = document.getElementById('forecastAlertBox');
+            const badgeStatus = document.getElementById('forecastBadgeStatus');
+
+            if (projectedPct >= 80) {
+                badgeStatus.className = 'text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 font-bold';
+                badgeStatus.innerText = 'เตือนระดับความจุสูง';
+                alertBox.className = 'mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800';
+                alertBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 mr-1"></i> <strong>คำเตือน:</strong> คลังสินค้านี้คาดว่าจะมีพื้นที่ใช้งานสูงถึง ${projectedPct}% ในอีก ${days} วัน ควรวางแผนระบายสินค้าออกหรือโอนย้ายคลังสินค้า`;
+            } else {
+                badgeStatus.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold';
+                badgeStatus.innerText = 'ระดับปกติ';
+                alertBox.className = 'mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800';
+                alertBox.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i> <strong>สภาวะปกติ:</strong> ความจุคงเหลือเพียงพอสำหรับรองรับปริมาณสินค้าในอีก ${days} วันข้างหน้า`;
+            }
+
+            // Draw Forecast Chart
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+
+            let labels = ['ปัจจุบัน'];
+            let dataPoints = [currentPct];
+
+            for (let i = 1; i <= days; i++) {
+                labels.push(`Day ${i}`);
+                let projectedStep = Math.min(100, ((currentStock + (netDailyGrowth * i)) / maxCap) * 100);
+                dataPoints.push(Math.round(projectedStep));
+            }
+
+            if (forecastChartInstance) forecastChartInstance.destroy();
+
+            forecastChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'ความจุ % (Occupancy Forecast)',
+                        data: dataPoints,
+                        borderColor: projectedPct >= 80 ? '#ef4444' : '#10b981',
+                        borderDash: [5, 5],
+                        backgroundColor: projectedPct >= 80 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { y: { min: 0, max: 100, title: { display: true, text: 'เปอร์เซ็นต์ (%)' } } }
+                }
+            });
+        }
+
+        // Modals & Form Handlers
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function saveNewWarehouse(e) {
+            e.preventDefault();
+            const id = document.getElementById('newWhoId').value;
+            const loc = document.getElementById('newWhoLoc').value;
+            const maxCap = parseInt(document.getElementById('newWhoMax').value);
+            const unit = document.getElementById('newWhoUnit').value;
+            const availCap = parseInt(document.getElementById('newWhoAvail').value);
+            const area = document.getElementById('newWhoArea').value;
+
+            warehouses.push({ id, location: loc, maxCap, unit, availCap, area });
+            closeModal('addWarehouseModal');
+            renderDashboard();
+            if (is3DInitialized) build3D5WarehouseGrid();
+            showToast(`เพิ่มคลังสินค้า ${id} สำเร็จ!`, 'success');
+        }
+
+        function saveInventoryLog(e) {
+            e.preventDefault();
+            const date = document.getElementById('newInvDate').value;
+            const current = parseInt(document.getElementById('newInvQty').value);
+            const max = parseInt(document.getElementById('newInvMax').value);
+            const usage = (current / max) * 100;
+
+            inventoryData.unshift({ date, current, max, usage });
+            closeModal('addInventoryModal');
+            renderInventoryTable();
+            showToast('บันทึกข้อมูลคงคลังสำเร็จ', 'success');
+        }
+
+        function saveInboundLog(e) {
+            e.preventDefault();
+            const date = document.getElementById('newInboundDate').value;
+            const whoId = document.getElementById('newInboundWho').value;
+            const qty = parseInt(document.getElementById('newInboundQty').value);
+            const supplier = document.getElementById('newInboundNote').value;
+
+            inboundData.unshift({ date, whoId, qty, supplier });
+            
+            let target = warehouses.find(w => w.id === whoId);
+            if (target) {
+                target.availCap = Math.max(0, target.availCap - qty);
+            }
+
+            closeModal('addInboundModal');
+            renderInboundTable();
+            renderDashboard();
+            if (is3DInitialized) update3DWarehouseColors();
+            showToast(`บันทึกรับสินค้าเข้า ${whoId} เรียบร้อยแล้ว`, 'success');
+        }
+
+        function saveOutboundLog(e) {
+            e.preventDefault();
+            const date = document.getElementById('newOutboundDate').value;
+            const whoId = document.getElementById('newOutboundWho').value;
+            const qty = parseInt(document.getElementById('newOutboundQty').value);
+            const destination = document.getElementById('newOutboundNote').value;
+
+            outboundData.unshift({ date, whoId, qty, destination });
+
+            let target = warehouses.find(w => w.id === whoId);
+            if (target) {
+                target.availCap = Math.min(target.maxCap, target.availCap + qty);
+            }
+
+            closeModal('addOutboundModal');
+            renderOutboundTable();
+            renderDashboard();
+            if (is3DInitialized) update3DWarehouseColors();
+            showToast(`บันทึกจ่ายสินค้าออกจาก ${whoId} เรียบร้อยแล้ว`, 'success');
+        }
+
+        function exportToCSV(tableId) {
+            let csv = [];
+            let rows = document.querySelectorAll(`#${tableId} tr`);
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll("td, th");
+                for (let j = 0; j < cols.length - 1; j++) row.push('"' + cols[j].innerText.trim() + '"');
+                csv.push(row.join(","));
+            }
+            let csvFile = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+            let downloadLink = document.createElement("a");
+            downloadLink.download = `${tableId}_export.csv`;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            showToast('ส่งออกไฟล์ CSV สำเร็จ', 'success');
+        }
+
+        // Live Clock Counter
+        function updateClock() {
+            const clockEl = document.getElementById('currentTime');
+            if (clockEl) {
+                const now = new Date();
+                clockEl.innerText = now.toLocaleTimeString('th-TH');
+            }
+        }
+
+        // Window Onload Initialization
+        window.onload = function() {
+            setInterval(updateClock, 1000);
+            updateClock();
+            populateWarehouseSelects();
+        };
+
+        // Helper Toast Notification
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            let bgClass = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-red-600' : 'bg-slate-800');
+            
+            toast.className = `${bgClass} text-white text-xs px-4 py-3 rounded-lg shadow-xl flex items-center space-x-2 transition-all duration-300 transform translate-y-2`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
