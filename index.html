@@ -68,6 +68,19 @@
             position: relative;
         }
 
+        .page-view {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .page-view.active {
+            display: block;
+        }
+
         #canvas-container {
             width: 100%;
             height: 100%;
@@ -143,6 +156,35 @@
             color: var(--text-muted);
             font-size: 0.9rem;
         }
+
+        /* ตารางรายการสินค้า */
+        .table-container {
+            padding: 30px;
+            height: 100%;
+            overflow-y: auto;
+            background-color: #0a0a0a;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #121212;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #1f1f1f;
+            color: #888;
+            font-weight: 600;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -151,40 +193,87 @@
 
     <div id="sidebar">
         <div class="brand">ไอซ์ คลังเก็บสินค้า</div>
-        <div class="menu-item active">ผังคลัง 3D</div>
-        <div class="menu-item">รายการสินค้า</div>
-        <div class="menu-item">บันทึกรับ-จ่าย</div>
-        <div class="menu-item">รายงาน/สถิติ</div>
+        <div class="menu-item active" onclick="switchPage('view-3d', this)">ผังคลัง 3D</div>
+        <div class="menu-item" onclick="switchPage('view-items', this)">รายการสินค้า</div>
+        <div class="menu-item" onclick="switchPage('view-logs', this)">บันทึกรับ-จ่าย</div>
+        <div class="menu-item" onclick="switchPage('view-reports', this)">รายงาน/สถิติ</div>
     </div>
 
     <div id="main-content">
-        <div id="canvas-container"></div>
-        <div id="loading">กำลังเชื่อมต่อ Google Sheets...</div>
+        <!-- หน้า 3D -->
+        <div id="view-3d" class="page-view active">
+            <div id="canvas-container"></div>
+            <div id="loading">กำลังเชื่อมต่อ Google Sheets...</div>
 
-        <div id="info-panel">
-            <div class="panel-header" id="warehouse-name">เลือกอาคาร/คลังสินค้า</div>
-            <div class="stat-grid">
-                <div class="stat-card">
-                    <div class="stat-label">รายการทั้งหมด</div>
-                    <div class="stat-value" id="total-items">0</div>
+            <div id="info-panel">
+                <div class="panel-header" id="warehouse-name">เลือกอาคาร/คลังสินค้า</div>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">รายการทั้งหมด</div>
+                        <div class="stat-value" id="total-items">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">จำนวนรวม</div>
+                        <div class="stat-value" id="total-qty">0</div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">จำนวนรวม</div>
-                    <div class="stat-value" id="total-qty">0</div>
+                <div style="font-size: 0.85rem; color: #aaa; margin-bottom: 10px;">
+                    สถานะเชื่อมต่อ: <span id="sync-status" style="color: #00ff00;">พร้อมใช้งาน</span>
                 </div>
+                <button class="btn" onclick="fetchSheetData()">รีเฟรชข้อมูลชีต</button>
             </div>
-            <div style="font-size: 0.85rem; color: #aaa; margin-bottom: 10px;">
-                สถานะเชื่อมต่อ: <span id="sync-status" style="color: #00ff00;">พร้อมใช้งาน</span>
+        </div>
+
+        <!-- หน้า รายการสินค้า -->
+        <div id="view-items" class="page-view">
+            <div class="table-container">
+                <h2>ตารางรายการสินค้า</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>รหัสสินค้า</th>
+                            <th>ชื่อสินค้า</th>
+                            <th>คลังจัดเก็บ</th>
+                            <th>จำนวน</th>
+                            <th>สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body">
+                        <tr><td colspan="5" style="text-align:center;">กำลังโหลดข้อมูล...</td></tr>
+                    </tbody>
+                </table>
             </div>
-            <button class="btn" onclick="fetchSheetData()">รีเฟรชข้อมูลชีต</button>
+        </div>
+
+        <!-- หน้า บันทึกรับ-จ่าย -->
+        <div id="view-logs" class="page-view">
+            <div class="table-container">
+                <h2>บันทึกรับ-จ่ายสินค้า</h2>
+                <p style="color: #888; margin-top: 10px;">ส่วนบันทึกประวัติเข้า-ออกสินค้า</p>
+            </div>
+        </div>
+
+        <!-- หน้า รายงาน/สถิติ -->
+        <div id="view-reports" class="page-view">
+            <div class="table-container">
+                <h2>รายงาน และ สถิติ</h2>
+                <p style="color: #888; margin-top: 10px;">ส่วนสรุปรายงานประจำเดือน</p>
+            </div>
         </div>
     </div>
 
     <script>
-        // นำ URL Web App จาก Step 2 มาวางตรงนี้
         const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyTa4qBlc2BnfHglJr_WzalCJS2vRd7h7bv6zbB8lb29LgwoQzHs6aZRCiVkCgPRrLr9w/exec';
-
         let sheetData = [];
+
+        // ฟังก์ชันสลับเมนู
+        function switchPage(pageId, element) {
+            document.querySelectorAll('.page-view').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+
+            document.getElementById(pageId).classList.add('active');
+            element.classList.add('active');
+        }
 
         async function fetchSheetData() {
             const statusEl = document.getElementById('sync-status');
@@ -199,11 +288,25 @@
                 document.getElementById('total-items').innerText = sheetData.length;
                 
                 let totalQty = 0;
+                let tableRowsHtml = '';
+
                 sheetData.forEach(item => {
                     const qty = item.Quantity || item.quantity || 0;
                     totalQty += Number(qty);
+
+                    tableRowsHtml += `
+                        <tr>
+                            <td>${item.id || '-'}</td>
+                            <td>${item.name || '-'}</td>
+                            <td>${item.warehouse || '-'}</td>
+                            <td>${qty}</td>
+                            <td>${item.status || '-'}</td>
+                        </tr>
+                    `;
                 });
+
                 document.getElementById('total-qty').innerText = totalQty;
+                document.getElementById('inventory-table-body').innerHTML = tableRowsHtml;
 
                 statusEl.innerText = 'เชื่อมต่อสำเร็จ';
                 statusEl.style.color = '#00ff00';
